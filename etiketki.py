@@ -1,4 +1,3 @@
-python
 import time
 import pandas as pd
 from selenium import webdriver
@@ -9,7 +8,7 @@ from selenium.webdriver.common.keys import Keys
 EXCEL_INPUT_PATH = 'arcticles.xlsx'  # Путь к вашему Excel-файлу с артиклями
 EXCEL_OUTPUT_PATH = 'arcticles_output.xlsx'  # Путь для сохранения результатов
 WEBDRIVER_PATH = 'path/to/chromedriver'  # Укажите путь к вашему ChromeDriver
-WEBSITE_URL = 'https://example.com/catalog'  # Укажите URL сайта
+WEBSITE_URL = 'https://www.kirpich.ru/shop/'  # Укажите URL сайта
 
 # Селекторы (необходимо заменить на актуальные для вашего сайта)
 SEARCH_INPUT_SELECTOR = 'input#search'  # Селектор поисковой строки
@@ -67,7 +66,7 @@ def process_article(driver, article):
         return data
     except Exception as e:
         print(f"Ошибка при обработке артикля {article}: {e}")
-        return {'Артикул': article, *{param: 'Ошибка' for param in PARAMETER_SELECTORS}}
+        return {'Артикул': article, **{param: 'Ошибка' for param in PARAMETER_SELECTORS}}
 
 def main():
     # Чтение артиклей из Excel
