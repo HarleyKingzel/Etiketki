@@ -3,97 +3,98 @@ import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
+from collections import defaultdict
 
 # Настройки
-EXCEL_INPUT_PATH = 'Артикли.xlsx'  # Путь к вашему Excel-файлу с артиклями
-EXCEL_OUTPUT_PATH = 'Данныеt.xlsx'  # Путь для сохранения результатов
-WEBDRIVER_PATH = 'C://chromedriver'  # Укажите путь к вашему ChromeDriver
-WEBSITE_URL = 'https://www.kirpich.ru/shop/'  # Укажите URL сайта
+EXCEL_INPUT_FILE = 'Артикли.xlsx'        # Входной Excel файл
+EXCEL_OUTPUT_FILE = 'Результаты.xlsx'    # Выходной Excel файл
+SEARCH_URL = 'https://kirpich.ru/shop'
 
-# Селекторы (необходимо заменить на актуальные для вашего сайта)
-SEARCH_INPUT_SELECTOR = 'input#autocomplete'  # Селектор поисковой строки
-SEARCH_BUTTON_SELECTOR = 'button#use'  # Селектор кнопки поиска (если есть)
-RESULT_ITEM_SELECTOR = 'div.card_hover-area-wrapper'
-PARAMETER_SELECTORS = {
-    'Вид материала': 'single-tabs > div.tab-content.is-active > div > div.chars__column.chars__column--big > ul > li:nth-child(9)',
-    'Название': 'single-tabs > div.tab-content.is-active > div > div.chars__column.chars__column--big > ul > li:nth-child(7) > span:nth-child(2)',
-    'Пустотность': '#single-tabs > div.tab-content.is-active > div > div.chars__column.chars__column--big > ul > li:nth-child(14) > span:nth-child(2)',
-    'Поверхность': '#single-tabs > div.tab-content.is-active > div > div.chars__column.chars__column--big > ul > li:nth-child(12) > span:nth-child(2)',
-    'Размер': '#single-tabs > div.tab-content.is-active > div > div.chars__column.chars__column--big > ul > li:nth-child(5) > span:nth-child(2)',
-    'Морозостойкость': '#single-tabs > div.tab-content.is-active > div > div.chars__column.chars__column--big > ul > li:nth-child(8) > span:nth-child(2)',
-    'Марка': '#single-tabs > div.tab-content.is-active > div > div.chars__column.chars__column--big > ul > li:nth-child(2) > span:nth-child(2)',
-    'Загрузка поддон': '#single-tabs > div.tab-content.is-active > div > div:nth-child(2) > ul > li:nth-child(3) > span:nth-child(2)',
-    'Загрузка машины': '#single-tabs > div.tab-content.is-active > div > div:nth-child(2) > ul > li:nth-child(4) > span:nth-child(2)'
-}
+# Чтение данных из Excel
+def read_articles(file_path):
+    df = pd.read_excel(file_path)
+    # Предполагаем, что нужные артикулы находятся в первом столбце
+    articles = df.iloc[:, 0].dropna().astype(str).tolist()
+    return articles
 
-# Функция для инициализации веб-драйвера
+# Запись данных в Excel
+def write_results(data, file_path):
+    df = pd.DataFrame(data)
+    df.to_excel(file_path, index=False)
+
+# Инициализация веб-драйвера
 def init_driver():
     options = webdriver.ChromeOptions()
-    options.add_argument('--headless')  # Запуск без UI
+    #options.add_argument('--headless')  # Запуск без интерфейса браузера
     options.add_argument('--disable-gpu')
-    driver = webdriver.Chrome(executable_path=WEBDRIVER_PATH, options=options)
+    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
     return driver
 
-# Функция для обработки одного артикля
-def process_article(driver, article):
-    try:
-        driver.get(WEBSITE_URL)
-        time.sleep(2)  # Ожидание загрузки страницы
-        # Ввод артикля в поисковую строку
-        search_input = driver.find_element(By.CSS_SELECTOR, SEARCH_INPUT_SELECTOR)
-        search_input.clear()
-        search_input.send_keys(article)
-        # Нажатие кнопки поиска, если требуется
-        if SEARCH_BUTTON_SELECTOR:
-            search_button = driver.find_element(By.CSS_SELECTOR, SEARCH_BUTTON_SELECTOR)
-            search_button.click()
-        else:
-            search_input.send_keys(Keys.RETURN)
-        time.sleep(3)  # Ожидание загрузки результатов поиска
-        # Нажатие на первую найденную позицию
-        first_result = driver.find_element(By.CSS_SELECTOR, RESULT_ITEM_SELECTOR)
-        first_result.click()
-        time.sleep(3)  # Ожидание загрузки страницы товара
-        # Извлечение параметров
-        data = {'Артикул': article}
-        for param, selector in PARAMETER_SELECTORS.items():
-            try:
-                element = driver.find_element(By.CSS_SELECTOR, selector)
-                data[param] = element.text.strip()
-            except:
-                data[param] = 'Не найдено'
-        return data
-    except Exception as e:
-        print(f"Ошибка при обработке артикля {article}: {e}")
-        return {'Артикул': article, **{param: 'Ошибка' for param in PARAMETER_SELECTORS}}
-
+# Основная функция
 def main():
-    # Чтение артиклей из Excel
-    df = pd.read_excel(EXCEL_INPUT_PATH)
-    # Проверка наличия столбца 'Артикул'
-    if 'Артикул' not in df.columns:
-        print("В Excel нет столбца 'Артикул'. Пожалуйста, проверьте файл.")
-        return
-    articles = df['Артикул'].dropna().unique()
-    # Подготовка списка для результатов
-    results = []
-    # Инициализация веб-драйвера
+    articles = read_articles(EXCEL_INPUT_FILE)
     driver = init_driver()
-    try:
-        for idx, article in enumerate(articles, 1):
-            print(f"Обработка {idx}/{len(articles)}: Артикул {article}")
-            data = process_article(driver, str(article))
-            results.append(data)
-    finally:
-        driver.quit()
-    # Создание DataFrame с результатами
-    results_df = pd.DataFrame(results)
-    # Объединение исходного DataFrame с результатами по артиклю
-    final_df = df.merge(results_df, on='Артикул', how='left')
-    # Сохранение результатов в Excel
-    final_df.to_excel(EXCEL_OUTPUT_PATH, index=False)
-    print(f"Результаты сохранены в {EXCEL_OUTPUT_PATH}")
+    results = []
+    all_specs = set()  # Для сбора всех возможных спецификаций
 
+    for idx, article in enumerate(articles, 1):
+        try:
+            print(f"Обработка {idx}/{len(articles)}: {article}")
+            driver.get(SEARCH_URL)
+            time.sleep(2)  # Ждем загрузки страницы
+
+            # Найти поле поиска
+            search_box = driver.find_element(By.NAME, 'q')  # Обновите селектор, если необходимо
+            search_box.clear()
+            search_box.send_keys(article)
+            search_box.send_keys(Keys.RETURN)  # Нажать Enter
+            time.sleep(3)  # Ждем результатов поиска
+
+            # Выбрать первый продукт в результатах
+            first_product = driver.find_element(By.CSS_SELECTOR, '.product-item a')  # Обновите селектор согласно сайту
+            first_product.click()
+            time.sleep(3)  # Ждем загрузки страницы продукта
+
+            # Извлечь данные из списка <li>
+            li_elements = driver.find_elements(By.CSS_SELECTOR, 'ul.specs-list li')  # Обновите селектор
+            specs = {}
+            for li in li_elements:
+                text = li.text
+                if ':' in text:
+                    key, value = map(str.strip, text.split(':', 1))
+                    specs[key] = value
+                    all_specs.add(key)
+                else:
+                    # Если формат неизвестен, можно сохранить как "Спецификация X"
+                    specs[text] = None
+
+            # Добавить артикул и спецификации
+            result = {'Артикул': article}
+            result.update(specs)
+            results.append(result)
+
+        except Exception as e:
+            print(f"Ошибка при обработке артикла {article}: {e}")
+            result = {'Артикул': article, 'Ошибка': str(e)}
+            results.append(result)
+
+    # Закрыть драйвер
+    driver.quit()
+
+    # Создать DataFrame с учетом всех спецификаций
+    df = pd.DataFrame(results)
+
+    # Переупорядочить столбцы: сначала 'Артикул', затем спецификации в алфавитном порядке или нужном порядке
+    cols = ['Артикул'] + sorted(all_specs)
+    if 'Ошибка' in df.columns:
+        cols.append('Ошибка')
+    df = df.reindex(columns=cols)
+
+    # Записать результаты в Excel
+    write_results(df, EXCEL_OUTPUT_FILE)
+    print(f"Завершено. Результаты сохранены в {EXCEL_OUTPUT_FILE}")
 
 if __name__ == "__main__":
     main()
