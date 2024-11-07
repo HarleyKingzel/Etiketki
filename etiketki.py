@@ -46,20 +46,19 @@ def main():
             time.sleep(2)  # Ждем загрузки страницы
 
             # Найти поле поиска
-            search_box = driver.find_element(By.NAME, 'q')  # Обновите селектор, если необходимо
+            search_box = driver.find_element(By.CSS_SELECTOR, 'input[name="q"]')
             search_box.clear()
             search_box.send_keys(article)
             search_box.send_keys(Keys.RETURN)  # Нажать Enter
             time.sleep(3)  # Ждем результатов поиска
 
             # Выбрать первый продукт в результатах
-            first_product = driver.find_element(By.CSS_SELECTOR, '.product-item a')  # Обновите селектор согласно сайту
+            first_product = driver.find_element(By.CSS_SELECTOR, 'a.card__slider')
             first_product.click()
             time.sleep(3)  # Ждем загрузки страницы продукта
 
             # Извлечь данные из списка <li>
-            li_elements = driver.find_elements(By.CSS_SELECTOR, 'ul.specs-list li')  # Обновите селектор
-            specs = {}
+            li_elements = driver.find_elements(By.CSS_SELECTOR, 'ul.specs-list li')
             for li in li_elements:
                 text = li.text
                 if ':' in text:
@@ -67,7 +66,6 @@ def main():
                     specs[key] = value
                     all_specs.add(key)
                 else:
-                    # Если формат неизвестен, можно сохранить как "Спецификация X"
                     specs[text] = None
 
             # Добавить артикул и спецификации
