@@ -7,6 +7,9 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 from collections import defaultdict
+from openpyxl import load_workbook
+import os
+
 
 # Настройки
 EXCEL_INPUT_FILE = 'Артикли.xlsx'        # Входной Excel файл
@@ -97,14 +100,41 @@ def main():
     df = pd.DataFrame([specs])
 
     # Переупорядочить столбцы: сначала 'Артикул', затем спецификации в алфавитном порядке или нужном порядке
-    cols = ['Артикул'] + list(all_specs)
-    if 'Ошибка' in df.columns:
-        cols.append('Ошибка')
-    df = df.reindex(columns=cols)
+    #cols = ['Артикул'] + list(all_specs)
+    #if 'Ошибка' in df.columns:
+    #    cols.append('Ошибка')
+    #df = df.reindex(columns=cols)
 
     # Записать результаты в Excel
-    write_results(df, EXCEL_OUTPUT_FILE)
-    print(f"Завершено. Результаты сохранены в {EXCEL_OUTPUT_FILE}")
+    #write_results(df, EXCEL_OUTPUT_FILE)
+    #print(f"Завершено. Результаты сохранены в {EXCEL_OUTPUT_FILE}")
+
+    # Проверяем, существует ли файл
+    if os.path.exists(EXCEL_OUTPUT_FILE):
+        # Загружаем существующий файл
+        book = load_workbook(EXCEL_OUTPUT_FILE)
+        writer = pd.ExcelWriter(EXCEL_OUTPUT_FILE, engine='openpyxl') 
+        writer.book = book
+
+        # Если лист с нужным именем уже существует, выбираем его
+        if 'Sheet1' in book.sheetnames:
+            writer.sheets = {ws.title: ws for ws in book.worksheets}
+            # Определяем, с какой строки начать запись
+            startrow = writer.sheets['Sheet1'].max_row
+
+            # Записываем новые данные без перезаписи заголовков
+            df.to_excel(writer, sheet_name='Sheet1', startrow=startrow, index=False, header=False)
+        else:
+            # Если листа нет, создаем его с заголовками
+            df.to_excel(writer, sheet_name='Sheet1', index=False)
+
+        writer.save()
+    else:
+        # Если файла не существует, создаем его и записываем данные с заголовками
+        with pd.ExcelWriter(EXCEL_OUTPUT_FILE, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Sheet1', index=False)
+
+    print("Данные успешно добавлены в Excel файл.")
 
 if __name__ == "__main__":
     main()
