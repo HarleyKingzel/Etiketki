@@ -1,4 +1,5 @@
 import time
+import re
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -37,6 +38,7 @@ def main():
     articles = read_articles(EXCEL_INPUT_FILE)
     driver = init_driver()
     results = []
+    specs = {}
     all_specs = set()  # Для сбора всех возможных спецификаций
 
     for idx, article in enumerate(articles, 1):
@@ -57,21 +59,31 @@ def main():
             first_product.click()
             time.sleep(3)  # Ждем загрузки страницы продукта
 
-            # Извлечь данные из списка <li>
-            li_elements = driver.find_elements(By.CSS_SELECTOR, 'ul.specs-list li')
+            # Находим все элементы <li> внутри <ul class="specs-list">
+            li_elements = driver.find_elements(By.CSS_SELECTOR, 'ul.chars__list.chars__list--dotted li')
+            
             for li in li_elements:
-                text = li.text
-                if ':' in text:
-                    key, value = map(str.strip, text.split(':', 1))
-                    specs[key] = value
-                    all_specs.add(key)
-                else:
-                    specs[text] = None
-
-            # Добавить артикул и спецификации
-            result = {'Артикул': article}
-            result.update(specs)
-            results.append(result)
+                try:
+                    # Извлекаем все <span> внутри текущего <li>
+                    spans = li.find_elements(By.TAG_NAME, 'span')
+                    
+                    if len(spans) >= 2:
+                        # Первый <span> с классом "product_content_info" — это ключ
+                        key = spans[0].text.strip()
+                        # Второй <span> — это значение
+                        value = spans[1].text.strip()
+                        
+                        # Записываем в словарь specs
+                        specs[key] = value
+                        # Добавляем ключ в множество all_specs
+                        all_specs.add(key)
+                    else:
+                        # Если по какой-то причине количество <span> меньше 2, обрабатываем иначе
+                        text = li.text.strip()
+                        specs[text] = None
+                        all_specs.add(text)
+                except Exception as e:
+                    print(f"Ошибка при обработке элемента: {e}")
 
         except Exception as e:
             print(f"Ошибка при обработке артикла {article}: {e}")
@@ -82,10 +94,10 @@ def main():
     driver.quit()
 
     # Создать DataFrame с учетом всех спецификаций
-    df = pd.DataFrame(results)
+    df = pd.DataFrame([specs])
 
     # Переупорядочить столбцы: сначала 'Артикул', затем спецификации в алфавитном порядке или нужном порядке
-    cols = ['Артикул'] + sorted(all_specs)
+    cols = ['Артикул'] + list(all_specs)
     if 'Ошибка' in df.columns:
         cols.append('Ошибка')
     df = df.reindex(columns=cols)
